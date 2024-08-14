@@ -1,0 +1,20 @@
+[workspace]
+members = [
+  "argon2",
+  "tests",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.0.0"
+authors = ["Víctor García"]
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+codegen-units = 1
+debug = false
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

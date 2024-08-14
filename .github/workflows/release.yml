@@ -1,0 +1,90 @@
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  pull_request:
+  push:
+    tags:
+      - "**[0-9]+.[0-9]+.[0-9]+*"
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - run: rustup toolchain install stable --profile minimal
+      - name: Rust Cache Action
+        uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add wasm32-wasi
+          make install-xtp
+          make test
+
+  changelog:
+    name: Generate changelog
+    runs-on: ubuntu-latest
+    outputs:
+      content: ${{ steps.git-cliff.outputs.content }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate a changelog
+        uses: orhun/git-cliff-action@v3
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SOURCE_BRANCH: "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+
+      - name: Print
+        run: cat "${{ steps.git-cliff.outputs.changelog }}"
+
+  build:
+    name: Build
+    needs: [changelog, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # selecting a toolchain either by action or manual `rustup` calls should happen
+      # before the plugin, as the cache uses the current rustc version as its cache key
+      - run: rustup toolchain install stable --profile minimal
+      - name: Rust Cache Action
+        uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add wasm32-wasi
+          make build-release
+          mkdir builds
+          mv ./target/wasm32-wasi/release/*.wasm builds/
+      - name: Generate SHA-256 hashes
+        run: |
+          for file in builds/*; do
+            sha256sum "$file" | awk '{ print $1 }' > "${file}.sha256"
+          done
+      - if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: builds/*
+          artifactErrorsFailBuild: true
+          body: ${{ needs.changelog.outputs.content }}
+          prerelease:
+            ${{ contains(github.ref_name, '-prerelease') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') ||
+            contains(github.ref_name, '-rc') }}
+          skipIfReleaseExists: true
