@@ -364,7 +364,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "plugin-argon2"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "argon2",
  "chacha20poly1305",
@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "plugin-test"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "extism-pdk",
  "xtp-test",
